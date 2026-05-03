@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XPath Studio &mdash; Selenium Locator Generator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-theme="light">
+
+  <!-- ================= TOP BAR ================= -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">X</div>
+      <div class="brand-text">
+        <h1>XPath Studio</h1>
+        <span class="tag">Selenium Locator Generator</span>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <span id="status-pill" class="status-pill status-idle">Idle</span>
+      <button id="btn-sample" class="btn btn-ghost" type="button" title="Load a sample HTML page">
+        Load Sample
+      </button>
+      <button id="btn-theme" class="btn btn-ghost btn-theme" type="button"
+              title="Toggle theme (Ctrl+Shift+L)" aria-label="Toggle dark mode">
+        <!-- Sun icon (shown in dark mode → click to go light) -->
+        <svg class="theme-svg sun" viewBox="0 0 24 24" width="16" height="16" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+        </svg>
+        <!-- Moon icon (shown in light mode → click to go dark) -->
+        <svg class="theme-svg moon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <span class="theme-label">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= MAIN GRID ================= -->
+  <main class="workspace">
+
+    <!-- ----- LEFT: SOURCE INPUT (HTML or URL) ----- -->
+    <section class="panel panel-input" aria-label="Source Input">
+      <div class="panel-head">
+        <div class="tabs" role="tablist" aria-label="Input mode">
+          <button id="tab-html" class="tab tab-active" role="tab"
+                  aria-selected="true" data-mode="html" type="button">
+            <span class="tab-icon" aria-hidden="true">&#60;/&#62;</span> Paste HTML
+          </button>
+          <button id="tab-url" class="tab" role="tab"
+                  aria-selected="false" data-mode="url" type="button">
+            <span class="tab-icon" aria-hidden="true">&#127760;</span> Fetch URL
+          </button>
+          <button id="tab-live" class="tab" role="tab"
+                  aria-selected="false" data-mode="live" type="button">
+            <span class="tab-icon" aria-hidden="true">&#9654;</span> Live Browse
+          </button>
+        </div>
+        <div class="panel-actions">
+          <button id="btn-clear"  class="btn btn-ghost btn-sm" type="button">Clear</button>
+          <button id="btn-render" class="btn btn-primary btn-sm" type="button">
+            <span id="btn-render-label">Render</span>
+            <span id="btn-render-spinner" class="spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- HTML paste mode -->
+      <div id="pane-html" class="input-pane">
+        <textarea
+          id="html-input"
+          class="html-input"
+          spellcheck="false"
+          placeholder="Paste full HTML source here (minified or formatted) and press Render — or use Ctrl+Enter."
+        ></textarea>
+      </div>
+
+      <!-- URL fetch mode -->
+      <div id="pane-url" class="input-pane hidden">
+        <button id="btn-scroll-top" class="scroll-top-fab is-faded" type="button"
+                title="Back to top" aria-label="Scroll to top">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5"></path>
+            <path d="M5 12l7-7 7 7"></path>
+          </svg>
+        </button>
+        <div class="url-form">
+
+          <!-- Shared URL field used by all three flows -->
+          <section class="url-section url-section-input">
+            <label for="url-input" class="field-label">Page URL</label>
+            <div class="url-row">
+              <input id="url-input" type="url" class="url-input"
+                     placeholder="https://example.com/path/to/page" autocomplete="off"
+                     spellcheck="false" />
+            </div>
+            <p class="field-hint">
+              Use the same URL with whichever flow below fits the site.
+              Press the top <strong>Render</strong> button (or Ctrl/⌘ + Enter) to fetch via proxy.
+            </p>
+          </section>
+
+          <!-- Capture-waiting card (shown while Open & Capture is in flight) -->
+          <section id="capture-waiting" class="url-section capture-waiting hidden" aria-live="polite">
+            <header class="url-section-head">
+              <span class="capture-spinner" aria-hidden="true"></span>
+              <h3>Waiting for capture…</h3>
+            </header>
+
+            <ol class="capture-steps">
+              <li>
+                <span class="step-num">1</span>
+                <div>Tab opened: <code id="capture-waiting-url"></code></div>
+              </li>
+              <li>
+                <span class="step-num">2</span>
+                <div>On that tab, click your <strong>Copy HTML for XPath Studio</strong> bookmark.</div>
+              </li>
+              <li>
+                <span class="step-num">3</span>
+                <div>We'll auto-render the page here.</div>
+              </li>
+            </ol>
+
+            <div class="capture-actions">
+              <button id="btn-paste-during-capture" class="btn btn-primary btn-sm" type="button"
+                      title="Use this if the bookmarklet copied to clipboard instead of auto-sending (e.g. on Google / GitHub / banking sites)">
+                <span aria-hidden="true">&#128203;</span> Paste from clipboard
+              </button>
+              <button id="btn-cancel-capture" class="btn btn-ghost btn-sm" type="button">Cancel</button>
+            </div>
+
+            <details id="capture-troubleshoot" class="advanced">
+              <summary>Stuck? Common reasons capture doesn't auto-fire</summary>
+              <ul class="field-hint" style="padding-left:18px; margin-top:6px; line-height:1.6">
+                <li>You haven't dragged the bookmarklet to your bookmarks bar yet — see Flow C below.</li>
+                <li>The site uses <code>Cross-Origin-Opener-Policy: same-origin</code> (Google, GitHub, banking sites) which severs the link to this tab. The bookmarklet falls back to clipboard automatically — click <strong>Paste from clipboard</strong> above.</li>
+                <li>You ran the bookmarklet on a different tab. Use Flow C's <em>Paste from clipboard &amp; render</em>.</li>
+                <li>Pop-ups are blocked. Allow pop-ups for this page and try again.</li>
+              </ul>
+            </details>
+          </section>
+
+          <!-- Flow 1: Open & Capture (authenticated/SPA pages, uses browser session) -->
+          <section class="url-section flow-recommended">
+            <header class="url-section-head">
+              <span class="url-step url-step-success">A</span>
+              <h3>Open &amp; Capture</h3>
+              <span class="url-section-tag tag-success">uses your browser session</span>
+            </header>
+
+            <p class="field-hint" style="margin-top:4px">
+              Opens the URL in a new tab using your <strong>existing browser session</strong> —
+              cookies, login state, Cloudflare clearance, all of it. Then your bookmarklet
+              auto-sends the rendered HTML back here. <strong>Best for SPAs, logged-in pages, internal apps.</strong>
+            </p>
+
+            <button id="btn-open-capture" class="btn btn-primary" type="button">
+              <span aria-hidden="true">&#8599;</span> Open in new tab &amp; capture
+            </button>
+
+            <p class="field-hint" style="margin-top:6px">
+              Requires the bookmarklet (set up once below). Allow pop-ups for this page.
+            </p>
+          </section>
+
+          <!-- Flow 2: Proxy fetch (static / SSR pages without auth) -->
+          <section class="url-section">
+            <header class="url-section-head">
+              <span class="url-step">B</span>
+              <h3>Fetch via proxy</h3>
+              <span class="url-section-tag">public / SSR pages</span>
+            </header>
+
+            <p class="field-hint" style="margin-top:4px">
+              Routed through public CORS proxies with automatic fallback across 8 services.
+              Best for static / server-rendered pages without authentication.
+              Press <strong>Render</strong> at the top to use this flow.
+            </p>
+
+            <!-- Live attempt log — populated by app.js while the chain runs -->
+            <div id="attempt-log" class="attempt-log hidden" aria-live="polite"></div>
+
+            <div class="url-options">
+              <label class="switch">
+                <input id="toggle-strip-scripts" type="checkbox" checked />
+                <span>Strip &lt;script&gt; tags from response</span>
+              </label>
+              <label class="switch">
+                <input id="toggle-inject-base" type="checkbox" checked />
+                <span>Inject &lt;base href&gt; so images/CSS resolve</span>
+              </label>
+            </div>
+
+            <details class="advanced">
+              <summary>Advanced: custom proxy</summary>
+              <label for="custom-proxy" class="field-label">Custom proxy template</label>
+              <input id="custom-proxy" type="text" class="url-input"
+                     placeholder="https://my-proxy.example.com/?url={url}"
+                     spellcheck="false" autocomplete="off" />
+              <p class="field-hint">
+                Tried before the public proxies. Use <code>{url}</code> as the placeholder,
+                or end with <code>=</code> / <code>?</code> / <code>/</code> to append.
+                Saved in <code>localStorage</code>. The last successful proxy is also
+                cached and tried first on the next fetch.
+              </p>
+            </details>
+          </section>
+
+          <!-- Flow 3: Bookmarklet setup -->
+          <section class="url-section bookmarklet-section">
+            <header class="url-section-head">
+              <span class="url-step">C</span>
+              <h3>Bookmarklet setup</h3>
+              <span class="url-section-tag">one-time</span>
+            </header>
+
+            <p class="field-hint" style="margin-top:4px">
+              Drag this button to your bookmarks bar. After that, click it on <strong>any page</strong>
+              and it will automatically open XPath Studio and send the HTML. No manual pasting needed.
+            </p>
+
+            <!-- Method 1: Drag (may not work in all browsers) -->
+            <div class="bookmarklet-wrap">
+              <a id="bookmarklet-link" class="bookmarklet" href="#" draggable="true"
+                 title="Drag me to your bookmarks bar">
+                <span aria-hidden="true">&#9733;</span> Copy HTML for XPath Studio
+              </a>
+              <span class="field-hint" style="margin-left:8px; vertical-align:middle;">Try dragging to bookmarks bar</span>
+            </div>
+
+            <!-- Method 2: Manual install (always works) -->
+            <div class="manual-bookmark-box">
+              <p class="field-label" style="margin-bottom:6px;">Can't drag? Create the bookmark manually:</p>
+              <ol class="manual-steps">
+                <li>
+                  <button id="btn-copy-bookmarklet" class="btn btn-primary btn-sm" type="button">
+                    <span aria-hidden="true">&#128203;</span> Copy bookmarklet code
+                  </button>
+                </li>
+                <li>Right-click your <strong>bookmarks bar</strong> &rarr; choose <strong>"Add page"</strong> or <strong>"Add bookmark"</strong></li>
+                <li>Set the <strong>Name</strong> to: <code>Copy HTML for XPath Studio</code></li>
+                <li>In the <strong>URL</strong> field, <strong>paste</strong> the code you just copied</li>
+                <li>Click <strong>Save</strong> &mdash; done!</li>
+              </ol>
+
+              <details class="advanced" style="margin-top:6px">
+                <summary>Show the raw bookmarklet code</summary>
+                <textarea id="bookmarklet-code-box" readonly rows="4"
+                  style="width:100%; margin-top:6px; font-family:var(--font-mono); font-size:11px;
+                         background:var(--bg-code); color:var(--text); border:1px solid var(--border);
+                         border-radius:6px; padding:8px 10px; resize:vertical; word-break:break-all;"
+                ></textarea>
+                <p class="field-hint" style="margin-top:4px">
+                  Select all (Ctrl+A) &rarr; Copy (Ctrl+C) &rarr; paste into the bookmark URL field.
+                </p>
+              </details>
+            </div>
+
+            <div style="margin-top:8px">
+              <span class="field-label">XPath Studio URL (embedded in bookmarklet)</span>
+              <div style="margin-top:4px">
+                <code id="studio-url-display" style="font-size:11.5px; word-break:break-all; display:block; padding:6px 10px; background:var(--bg-soft); border:1px solid var(--border); border-radius:6px;"></code>
+              </div>
+              <p class="field-hint" style="margin-top:4px">
+                The bookmarklet knows this URL. When you click it on any page, it opens XPath Studio
+                and sends the HTML automatically. If you move XPath Studio to a different URL, re-create the bookmark.
+              </p>
+            </div>
+
+            <details class="advanced">
+              <summary>How does it work?</summary>
+              <p class="field-hint" style="margin-top:8px">
+                Browser security (the <strong>same-origin policy</strong>) prevents this
+                page from reading cookies or fetching authenticated content from another
+                domain. The bookmarklet runs a small script <em>inside</em> the target tab,
+                reads <code>document.documentElement.outerHTML</code>, and sends it to
+                XPath Studio via <code>postMessage</code>.
+              </p>
+            </details>
+
+            <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+              <p class="field-hint" style="margin-bottom:6px">
+                Already used the bookmarklet? Paste whatever's on your clipboard:
+              </p>
+              <button id="btn-paste-clipboard" class="btn btn-ghost btn-sm" type="button">
+                <span aria-hidden="true">&#128203;</span> Paste from clipboard &amp; render
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- Live Browse mode -->
+      <div id="pane-live" class="input-pane hidden">
+        <div class="live-browse-pane">
+          <section class="url-section url-section-input">
+            <label for="live-url-input" class="field-label">Enter URL to browse live</label>
+            <div class="url-row">
+              <input id="live-url-input" type="url" class="url-input"
+                     placeholder="https://example.com"
+                     autocomplete="off" spellcheck="false" />
+              <button id="btn-live-go" class="btn btn-primary btn-sm" type="button">Go</button>
+            </div>
+          </section>
+
+          <div class="live-info-card">
+            <h3>Smart auto-detection</h3>
+            <ol class="manual-steps" style="margin-top:8px">
+              <li>Click <strong>Go</strong> — we first try loading the site directly in the preview.</li>
+              <li>If the site <strong>allows iframe loading</strong>: interact with it live, then click <strong>Freeze &amp; Pick</strong>.</li>
+              <li>If the site <strong>blocks iframes</strong> (most do): we auto-detect this within 3 seconds and offer two fallbacks:
+                <ul style="margin-top:4px;padding-left:18px;list-style:disc">
+                  <li><strong>Open in new tab</strong> — uses your cookies/login. Best for authenticated pages.</li>
+                  <li><strong>Fetch via proxy</strong> — grabs static HTML. Best for public pages.</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+
+          <div class="live-status" id="live-status">
+            <span class="field-hint">Enter a URL and click Go to start.</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="html-validation" class="validation-msg" role="status" aria-live="polite"></div>
+    </section>
+
+    <!-- ----- RIGHT: RENDERED PAGE ----- -->
+    <section class="panel panel-preview" aria-label="Rendered Page">
+      <div class="panel-head">
+        <h2 id="preview-title">Rendered Page</h2>
+        <div class="panel-actions">
+          <label class="switch" title="Pause hover highlighting">
+            <input id="toggle-pick" type="checkbox" checked />
+            <span>Pick mode</span>
+          </label>
+          <button id="btn-clear-selection" class="btn btn-ghost btn-sm" type="button">Clear selection</button>
+          <button id="btn-expand-preview" class="btn btn-ghost btn-sm" type="button"
+                  title="Hide input panel to give the preview more space (Ctrl+Shift+E)"
+                  aria-pressed="false">
+            <svg class="icon-expand" viewBox="0 0 24 24" width="13" height="13" fill="none"
+                 stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 3H3v6"></path>
+              <path d="M21 9V3h-6"></path>
+              <path d="M21 15v6h-6"></path>
+              <path d="M3 15v6h6"></path>
+            </svg>
+            <svg class="icon-collapse" viewBox="0 0 24 24" width="13" height="13" fill="none"
+                 stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 10V4h6"></path>
+              <path d="M4 14h6v6"></path>
+              <path d="M14 14h6v6"></path>
+              <path d="M10 10H4V4"></path>
+            </svg>
+            <span id="expand-label">Expand</span>
+          </button>
+          <button id="btn-fullscreen" class="btn btn-ghost btn-sm" type="button"
+                  title="Open the preview fullscreen (Ctrl+Shift+F / Esc to exit)" aria-label="Fullscreen preview">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                 stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Address bar shown during live browsing -->
+      <div id="live-address-bar" class="live-address-bar hidden">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="live-label">LIVE</span>
+        <span id="live-address" class="live-address">about:blank</span>
+      </div>
+
+      <div class="preview-shell">
+        <iframe
+          id="preview-frame"
+          title="Rendered HTML preview"
+          sandbox="allow-same-origin"
+        ></iframe>
+
+        <div id="preview-empty" class="preview-empty">
+          <div class="empty-card">
+            <div class="empty-icon">&#9783;</div>
+            <h3>No page rendered yet</h3>
+            <p>Paste your HTML on the left and press <strong>Render</strong>, then hover and click any element to generate Selenium-ready XPaths.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----- BOTTOM: RESULTS ----- -->
+    <section class="panel panel-results" aria-label="XPath Results">
+
+      <!-- Selected element summary -->
+      <div class="selected-summary">
+        <div class="selected-head">
+          <h2>Selected Element</h2>
+          <div class="filters">
+            <button data-filter="all"        class="chip chip-active" type="button">All</button>
+            <button data-filter="attribute"  class="chip" type="button">Attribute</button>
+            <button data-filter="text"       class="chip" type="button">Text</button>
+            <button data-filter="relative"   class="chip" type="button">Relative</button>
+          </div>
+        </div>
+
+        <div id="selected-info" class="selected-info">
+          <span class="muted">Click an element in the preview to see details and generated locators.</span>
+        </div>
+
+        <div class="options-row">
+          <label class="switch">
+            <input id="toggle-index" type="checkbox" />
+            <span>Include positional index when needed</span>
+          </label>
+          <label class="switch">
+            <input id="toggle-css" type="checkbox" />
+            <span>Also show CSS selector</span>
+          </label>
+          <label class="switch">
+            <input id="toggle-snippet" type="checkbox" />
+            <span>Show Selenium snippet</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Locator cards -->
+      <div id="locator-list" class="locator-list">
+        <div class="empty-card empty-card-sm">
+          <p class="muted">Locator suggestions will appear here.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="footer">
+    <span>XPath Studio &middot; Built for QA Automation Engineers</span>
+    <span class="footer-meta">No data leaves your browser &middot; 100% client-side</span>
+  </footer>
+
+  <!-- Global scroll-to-top button -->
+  <button id="global-scroll-top" class="global-scroll-top is-faded" type="button"
+          title="Scroll to top" aria-label="Scroll to top">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+         stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 19V5"></path>
+      <path d="M5 12l7-7 7 7"></path>
+    </svg>
+  </button>
+
+  <!-- Toast container -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Scripts: engine first (pure functions), then app (UI controller) -->
+  <script src="xpath-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
